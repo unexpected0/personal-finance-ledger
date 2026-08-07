@@ -1,0 +1,13 @@
+# Personal financial records stay on this computer.
+data/
+
+# Python temporary files.
+__pycache__/
+*.py[cod]
+
+# Local editor and operating-system files.
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+

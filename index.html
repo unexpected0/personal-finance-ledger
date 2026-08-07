@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="离线优先的月度工资、支出与储蓄分析工具" />
+    <title>月度账本 · 收支与储蓄分析</title>
+    <link rel="stylesheet" href="ledger.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <button id="toggleSidebar" class="sidebar-toggle" type="button" aria-label="收起侧边栏" aria-expanded="true">‹</button>
+      <a class="brand" href="#top" aria-label="月度账本首页">
+        <span class="brand-mark">月</span>
+        <span><strong>月度账本</strong><small>PERSONAL LEDGER</small></span>
+      </a>
+
+      <nav class="side-nav" aria-label="页面导航">
+        <a class="active" href="#overview"><span>01</span><b>财务概览</b></a>
+        <a href="#trends"><span>02</span><b>趋势分析</b></a>
+        <a href="#records"><span>03</span><b>月度记录</b></a>
+      </nav>
+
+      <div class="sidebar-note">
+        <span class="privacy-dot"></span>
+        <div><strong>数据仅在本机</strong><p>自动保存至项目 data 文件夹，不上传网络。</p></div>
+      </div>
+      <p class="sidebar-foot">人民币 CNY · 本地账本</p>
+    </aside>
+
+    <main id="top" class="main-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">PERSONAL FINANCE</p>
+          <h1>让每一笔收入，<br />都有清晰的去向</h1>
+          <p class="subtitle">只记录工资单与发薪后余额，剩下的交给账本计算。</p>
+        </div>
+        <div class="file-actions">
+          <span id="fileStatus" class="file-status"><i></i><span>正在读取本地账本</span></span>
+          <button id="addRecord" class="btn btn-primary" type="button"><span>＋</span> 记录本月</button>
+        </div>
+      </header>
+
+      <section id="overview" class="overview-section">
+        <div id="overviewHeading" class="section-heading">
+          <div>
+            <p class="section-kicker">本月快照</p>
+            <h2 id="selectedMonthTitle">尚未记录</h2>
+            <p id="selectedMonthMeta" class="snapshot-meta">添加首个月份后开始生成财务快照</p>
+          </div>
+          <div class="month-switcher">
+            <button id="prevMonth" type="button" aria-label="上一个月">←</button>
+            <button id="nextMonth" type="button" aria-label="下一个月">→</button>
+          </div>
+        </div>
+
+        <div id="emptyState" class="empty-state" hidden>
+          <span class="empty-state-mark">＋</span>
+          <p class="section-kicker">开始使用</p>
+          <h2>记录你的第一张工资单</h2>
+          <p>录入工资单汇总和发薪后的总余额，账本会自动计算之后每个发薪周期的支出与储蓄。</p>
+          <button id="startFirstRecord" class="btn btn-primary" type="button">记录第一个月份</button>
+        </div>
+
+        <div id="metricGrid" class="metric-grid">
+          <article class="metric-card metric-dark">
+            <p>实发工资 <span class="tag">现金收入</span></p>
+            <strong id="metricNet">—</strong>
+            <div class="metric-meta"><span id="metricNetChange">较上月 暂无数据</span><small>工资单实际到账</small></div>
+          </article>
+          <article class="metric-card">
+            <p>推算支出 <span class="info" title="按两次发薪后余额反推">i</span></p>
+            <strong id="metricExpense">—</strong>
+            <div class="metric-meta"><span id="metricExpenseChange">较上月 暂无数据</span><small>发薪周期口径</small></div>
+          </article>
+          <article class="metric-card">
+            <p>存款变化</p>
+            <strong id="metricSaving">—</strong>
+            <div class="progress-track"><i id="savingProgress"></i></div>
+            <div class="metric-meta"><span id="metricRate">储蓄率 暂无数据</span><small>本月新增</small></div>
+          </article>
+          <article class="metric-card">
+            <p>发薪后余额</p>
+            <strong id="metricBalance">—</strong>
+            <div class="metric-meta"><span id="metricBalanceChange">较上月 暂无数据</span><small>可用资金总额</small></div>
+          </article>
+          <article class="metric-card compact-metric">
+            <p>个人所得税</p>
+            <strong id="metricTax">—</strong>
+            <small id="metricTaxRate">占税前收入 暂无数据</small>
+          </article>
+          <article class="metric-card compact-metric">
+            <p>公积金总额</p>
+            <strong id="metricFund">—</strong>
+            <small id="metricFundSplit">个人 — · 公司 —</small>
+          </article>
+        </div>
+      </section>
+
+      <section id="trends" class="trend-grid">
+        <article class="panel chart-panel wide">
+          <div class="panel-heading">
+            <div><p class="section-kicker">现金流</p><h2>收入、支出与储蓄趋势</h2></div>
+            <div class="panel-tools">
+              <div class="chart-legend" aria-label="图例">
+                <span><i class="legend-income"></i>实发工资</span>
+                <span><i class="legend-expense"></i>推算支出</span>
+                <span><i class="legend-saving"></i>存款变化</span>
+              </div>
+              <button class="fullscreen-button" type="button" data-fullscreen-chart>全屏查看</button>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="cashflowChart" aria-label="收入支出储蓄趋势图"></canvas></div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <div><p class="section-kicker">资产轨迹</p><h2>发薪后余额</h2></div>
+            <div class="panel-tools">
+              <span id="balanceGain" class="gain-badge">暂无数据</span>
+              <button class="fullscreen-button" type="button" data-fullscreen-chart>全屏查看</button>
+            </div>
+          </div>
+          <div class="chart-wrap balance-chart"><canvas id="balanceChart" aria-label="发薪后余额趋势图"></canvas></div>
+          <p class="chart-note">每月均在工资到账后记录，确保统计口径一致。</p>
+        </article>
+
+        <article class="panel breakdown-panel">
+          <div class="panel-heading"><div><p class="section-kicker">工资结构</p><h2>从应发到实发</h2></div></div>
+          <div class="income-total"><span>税前收入</span><strong id="breakGross">—</strong></div>
+          <div class="stacked-bar" aria-label="工资扣除结构">
+            <i id="barNet" class="stack-net"></i><i id="barSocial" class="stack-social"></i><i id="barFund" class="stack-fund"></i><i id="barOther" class="stack-other"></i>
+          </div>
+          <div class="breakdown-list">
+            <div><span><i class="dot net"></i>实发工资</span><strong id="breakNet">—</strong></div>
+            <div><span><i class="dot social"></i>个人社保</span><strong id="breakSocial">—</strong></div>
+            <div><span><i class="dot fund"></i>个人公积金</span><strong id="breakFund">—</strong></div>
+            <div><span><i class="dot other"></i>税及其他扣款</span><strong id="breakOther">—</strong></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="records" class="panel records-panel">
+        <div class="panel-heading records-heading">
+          <div><p class="section-kicker">历史数据</p><h2>月度记录</h2></div>
+          <div class="records-actions">
+            <button id="exportCsv" class="text-button" type="button">导出 CSV</button>
+            <button id="addRecordSecondary" class="btn btn-primary" type="button">＋ 新增月份</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>工资月份</th><th>税前收入</th><th>实发工资</th><th>推算支出</th><th>存款变化</th><th>发薪后余额</th><th>储蓄率</th><th></th></tr></thead>
+            <tbody id="recordsBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <footer>月度账本 · 你的财务数据始终由你掌控</footer>
+    </main>
+
+    <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+    <aside id="recordDrawer" class="record-drawer" aria-hidden="true" aria-labelledby="drawerTitle">
+      <form id="recordForm">
+        <div class="drawer-head">
+          <div><p class="section-kicker">MONTHLY RECORD</p><h2 id="drawerTitle">记录本月</h2></div>
+          <button id="closeDrawer" class="close-button" type="button" aria-label="关闭">×</button>
+        </div>
+
+        <div class="form-scroll">
+          <section class="form-section">
+            <h3><span>01</span> 工资月份与收入</h3>
+            <div class="field-grid">
+              <label>工资所属月份 <small>工资在次月 7 日发放</small><input name="month" type="month" required /></label>
+              <label>税前收入 <small>应发合计，含补贴</small><input name="grossIncome" type="number" min="0" step="0.01" required /></label>
+              <label>其中补贴 <small>已包含在税前收入中</small><input name="allowance" type="number" min="0" step="0.01" value="0" /></label>
+              <label>实发工资 <small>工资单实际到账</small><input name="netIncome" type="number" min="0" step="0.01" required /></label>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <h3><span>02</span> 扣除与公积金</h3>
+            <div class="field-grid">
+              <label>个人社保<input name="personalSocial" type="number" min="0" step="0.01" value="0" /></label>
+              <label>个人所得税<input name="tax" type="number" min="0" step="0.01" value="0" /></label>
+              <label>个人公积金<input name="personalFund" type="number" min="0" step="0.01" value="0" /></label>
+              <label>公司公积金<input name="companyFund" type="number" min="0" step="0.01" value="0" /></label>
+              <label class="full-field">其他扣款 <small>伙食费、工会费等合计</small><input name="otherDeduction" type="number" min="0" step="0.01" value="0" /></label>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <h3><span>03</span> 发薪后余额</h3>
+            <div class="field-grid">
+              <label>发薪后可用资金总余额 <small>次月 7 日工资到账后的全部可用资金</small><input name="balance" type="number" min="0" step="0.01" required /></label>
+              <label>特殊资金调整 <small>额外流入填正数，转出填负数</small><input name="adjustment" type="number" step="0.01" value="0" /></label>
+              <label class="full-field">备注<input name="note" type="text" maxlength="100" placeholder="可选，例如：年终奖、旅行支出" /></label>
+            </div>
+          </section>
+
+          <div id="formPreview" class="form-preview">
+            <div><span>计算实发</span><strong>—</strong></div>
+            <div><span>工资单差异</span><strong>—</strong></div>
+            <div><span>公积金总额</span><strong>—</strong></div>
+          </div>
+        </div>
+
+        <div class="drawer-footer">
+          <input name="editingMonth" type="hidden" />
+          <button id="deleteRecord" class="delete-button" type="button" hidden>删除记录</button>
+          <span></span>
+          <button id="cancelDrawer" class="btn btn-quiet" type="button">取消</button>
+          <button class="btn btn-primary" type="submit">保存记录</button>
+        </div>
+      </form>
+    </aside>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="ledger.js"></script>
+  </body>
+</html>

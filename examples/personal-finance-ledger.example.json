@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "currency": "CNY",
+  "settings": {
+    "openingBalance": null,
+    "payDay": 7,
+    "payMonthOffset": 1
+  },
+  "updatedAt": null,
+  "records": []
+}
+
