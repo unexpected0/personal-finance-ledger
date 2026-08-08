@@ -9,6 +9,7 @@ let expandedChartKey = null;
 let lastChartTrigger = null;
 
 const FILE_PREVIEW = window.location.protocol === 'file:';
+const EDITOR_URL = 'http://127.0.0.1:4173/';
 
 const DATA_VERSION = 2;
 const MONEY_FIELDS = [
@@ -172,7 +173,7 @@ function renderTable() {
       <td class="${data.saving == null ? '' : data.saving >= 0 ? 'positive' : 'negative'}">${signedMoney(data.saving)}</td>
       <td>${money(record.balance)}</td>
       <td>${data.savingRate == null ? '—' : `${data.savingRate.toFixed(1)}%`}</td>
-      <td><button class="row-action" type="button" data-edit="${record.month}" ${FILE_PREVIEW ? 'disabled title="双击 HTML 为只读预览，请通过本地服务编辑"' : ''}>编辑</button></td>
+      <td><button class="row-action" type="button" data-edit="${record.month}" ${FILE_PREVIEW ? 'title="打开本地编辑模式"' : ''}>编辑</button></td>
     </tr>`;
   }).join('');
 
@@ -182,7 +183,16 @@ function renderTable() {
     render();
     document.querySelector('#overview').scrollIntoView({ behavior: 'smooth' });
   }));
-  body.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openDrawer(button.dataset.edit)));
+  body.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openRecordEditor(button.dataset.edit)));
+}
+
+function openRecordEditor(month = '') {
+  if (FILE_PREVIEW) {
+    const query = month ? `?edit=${encodeURIComponent(month)}` : '?action=new';
+    window.location.assign(`${EDITOR_URL}${query}`);
+    return;
+  }
+  openDrawer(month);
 }
 
 function openDrawer(month) {
@@ -555,9 +565,9 @@ function closeChartModal() {
   lastChartTrigger = null;
 }
 
-$('#addRecord').addEventListener('click', () => openDrawer());
-$('#addRecordSecondary').addEventListener('click', () => openDrawer());
-$('#startFirstRecord').addEventListener('click', () => openDrawer());
+$('#addRecord').addEventListener('click', () => openRecordEditor());
+$('#addRecordSecondary').addEventListener('click', () => openRecordEditor());
+$('#startFirstRecord').addEventListener('click', () => openRecordEditor());
 $('#closeDrawer').addEventListener('click', closeDrawer);
 $('#cancelDrawer').addEventListener('click', closeDrawer);
 $('#drawerBackdrop').addEventListener('click', closeDrawer);
@@ -629,7 +639,7 @@ async function initializeApp() {
     ledgerSettings = validated.settings;
     selectedMonth = records.at(-1)?.month || '';
     isDirty = false;
-    setStatus(FILE_PREVIEW ? '本机历史数据 · 只读预览' : 'data/personal-finance-ledger.json · 已载入', true);
+    setStatus(FILE_PREVIEW ? '本机历史数据 · 点击录入进入编辑模式' : 'data/personal-finance-ledger.json · 已载入', true);
   } catch {
     records = [];
     ledgerSettings = { openingBalance: null, payDay: 7, payMonthOffset: 1 };
@@ -641,10 +651,16 @@ async function initializeApp() {
   if (FILE_PREVIEW) {
     document.body.classList.add('file-preview');
     ['#addRecord', '#addRecordSecondary', '#startFirstRecord'].forEach(selector => {
-      const button = $(selector);
-      button.disabled = true;
-      button.title = '双击 HTML 为只读预览；通过本地服务运行时可编辑并自动保存';
+      $(selector).title = '打开本地编辑模式并自动保存到 data 文件夹';
     });
+  } else {
+    const params = new URLSearchParams(window.location.search);
+    const editMonth = params.get('edit');
+    if (editMonth && records.some(record => record.month === editMonth)) openDrawer(editMonth);
+    else if (params.get('action') === 'new') openDrawer();
+    if (editMonth || params.has('action')) {
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`);
+    }
   }
   updateActiveNavigation();
 }

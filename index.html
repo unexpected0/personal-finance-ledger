@@ -229,7 +229,15 @@
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="data/local-ledger.js"></script>
-    <script src="ledger.js"></script>
-  </body>
+  <script src="data/local-ledger.js"></script>
+  <script>
+    if (window.location.protocol === 'file:') {
+      const serverProbe = document.createElement('script');
+      serverProbe.src = `http://127.0.0.1:4173/server-ready.js?t=${Date.now()}`;
+      serverProbe.async = true;
+      document.head.appendChild(serverProbe);
+    }
+  </script>
+  <script src="ledger.js"></script>
+</body>
 </html>
