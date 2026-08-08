@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 DATA_FILE = ROOT / "data" / "personal-finance-ledger.json"
+DATA_SCRIPT = ROOT / "data" / "local-ledger.js"
 MAX_REQUEST_BYTES = 1_000_000
 
 
@@ -27,14 +28,23 @@ def empty_ledger() -> dict:
     }
 
 
+def write_local_script(payload: dict) -> None:
+    DATA_SCRIPT.parent.mkdir(parents=True, exist_ok=True)
+    script = "window.__LOCAL_LEDGER__ = " + json.dumps(payload, ensure_ascii=True) + ";\n"
+    temporary = DATA_SCRIPT.with_name(f".{DATA_SCRIPT.name}.tmp")
+    temporary.write_text(script, encoding="utf-8")
+    os.replace(temporary, DATA_SCRIPT)
+
+
 def ensure_data_file() -> None:
-    if DATA_FILE.exists():
-        return
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    DATA_FILE.write_text(
-        json.dumps(empty_ledger(), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    if not DATA_FILE.exists():
+        DATA_FILE.write_text(
+            json.dumps(empty_ledger(), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    payload = json.loads(DATA_FILE.read_text(encoding="utf-8"))
+    write_local_script(payload)
 
 
 def validate_ledger(payload: object) -> dict:
@@ -76,6 +86,7 @@ class LedgerHandler(SimpleHTTPRequestHandler):
             temporary = DATA_FILE.with_name(f".{DATA_FILE.name}.tmp")
             temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             os.replace(temporary, DATA_FILE)
+            write_local_script(payload)
             self._send_json(200, {"ok": True, "path": "data/personal-finance-ledger.json"})
         except (ValueError, json.JSONDecodeError) as error:
             self._send_json(400, {"ok": False, "error": str(error)})

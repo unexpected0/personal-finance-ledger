@@ -5,6 +5,10 @@ let isDirty = false;
 let toastTimer;
 let saveTimer;
 let saveRetryCount = 0;
+let expandedChartKey = null;
+let lastChartTrigger = null;
+
+const FILE_PREVIEW = window.location.protocol === 'file:';
 
 const DATA_VERSION = 2;
 const MONEY_FIELDS = [
@@ -168,7 +172,7 @@ function renderTable() {
       <td class="${data.saving == null ? '' : data.saving >= 0 ? 'positive' : 'negative'}">${signedMoney(data.saving)}</td>
       <td>${money(record.balance)}</td>
       <td>${data.savingRate == null ? '—' : `${data.savingRate.toFixed(1)}%`}</td>
-      <td><button class="row-action" type="button" data-edit="${record.month}">编辑</button></td>
+      <td><button class="row-action" type="button" data-edit="${record.month}" ${FILE_PREVIEW ? 'disabled title="双击 HTML 为只读预览，请通过本地服务编辑"' : ''}>编辑</button></td>
     </tr>`;
   }).join('');
 
@@ -375,7 +379,7 @@ function roundedValue(value) {
 function drawLineChart(canvas, series, options = {}) {
   const { context: ctx, width, height } = setupCanvas(canvas);
   if (!width || !height || !records.length) return;
-  const pad = { left: 48, right: 18, top: 16, bottom: 35 };
+  const pad = { left: 62, right: 22, top: 18, bottom: 42 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
   const values = series.flatMap(item => item.values.filter(value => value != null && Number.isFinite(value)));
@@ -389,7 +393,7 @@ function drawLineChart(canvas, series, options = {}) {
   const y = value => pad.top + (max - value) / span * plotH;
 
   ctx.clearRect(0, 0, width, height);
-  ctx.font = '9px Inter, sans-serif';
+  ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   ctx.textBaseline = 'middle';
   for (let line = 0; line <= 4; line++) {
     const py = pad.top + plotH * line / 4;
@@ -400,13 +404,13 @@ function drawLineChart(canvas, series, options = {}) {
     ctx.moveTo(pad.left, py);
     ctx.lineTo(width - pad.right, py);
     ctx.stroke();
-    ctx.fillStyle = '#98a19c';
+    ctx.fillStyle = '#747477';
     ctx.textAlign = 'right';
     ctx.fillText(roundedValue(value), pad.left - 9, py);
   }
   records.forEach((record, index) => {
     if (records.length > 8 && index % 2 && index !== records.length - 1) return;
-    ctx.fillStyle = '#8d9792';
+    ctx.fillStyle = '#747477';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(shortMonth(record.month), x(index), height - pad.bottom + 14);
@@ -422,7 +426,7 @@ function drawLineChart(canvas, series, options = {}) {
     if (item.fill) {
       const gradient = ctx.createLinearGradient(0, pad.top, 0, height - pad.bottom);
       gradient.addColorStop(0, item.fill);
-      gradient.addColorStop(1, 'rgba(39,108,85,0)');
+      gradient.addColorStop(1, 'rgba(57,118,74,0)');
       ctx.beginPath();
       ctx.moveTo(points[0].x, height - pad.bottom);
       points.forEach(point => ctx.lineTo(point.x, point.y));
@@ -443,7 +447,7 @@ function drawLineChart(canvas, series, options = {}) {
     points.forEach((point, index) => {
       if (records.length > 9 && index !== points.length - 1) return;
       ctx.beginPath();
-      ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
       ctx.fillStyle = '#fff';
       ctx.fill();
       ctx.lineWidth = 1.5;
@@ -487,20 +491,68 @@ function enableChartTooltip(canvas) {
   canvas.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
 }
 
+function chartDefinition(key) {
+  const derived = records.map((_, index) => derivedAt(index));
+  if (key === 'balance') return {
+    kicker: '资产轨迹',
+    title: '发薪后余额',
+    note: '展示每次工资到账后记录的可用资金总余额。',
+    options: {},
+    series: [{ label: '发薪后余额', color: '#39764a', width: 2.6, fill: 'rgba(57,118,74,.12)', values: records.map(record => record.balance) }]
+  };
+  return {
+    kicker: '现金流',
+    title: '收入、支出与储蓄趋势',
+    note: '按工资所属月份展示实发收入、推算支出与存款变化。',
+    options: { zeroBase: true },
+    series: [
+      { label: '实发工资', color: '#1d1d1f', width: 2.5, values: records.map(record => record.netIncome) },
+      { label: '推算支出', color: '#d9822b', width: 2.3, values: derived.map(item => item.expense) },
+      { label: '存款变化', color: '#0066cc', width: 2.3, values: derived.map(item => item.saving) }
+    ]
+  };
+}
+
+function drawExpandedChart() {
+  if (!expandedChartKey || $('#chartModal').hidden || !records.length) return;
+  const definition = chartDefinition(expandedChartKey);
+  drawLineChart($('#chartModalCanvas'), definition.series, definition.options);
+}
+
 function drawAllCharts() {
   if (!records.length) return;
-  const derived = records.map((_, index) => derivedAt(index));
-  drawLineChart($('#cashflowChart'), [
-    { label: '实发工资', color: '#1d1d1f', width: 2.3, values: records.map(record => record.netIncome) },
-    { label: '推算支出', color: '#d9822b', values: derived.map(item => item.expense) },
-    { label: '存款变化', color: '#0066cc', values: derived.map(item => item.saving) }
-  ], { zeroBase: true });
-  drawLineChart($('#balanceChart'), [
-    { label: '发薪后余额', color: '#39764a', width: 2.4, fill: 'rgba(57,118,74,.12)', values: records.map(record => record.balance) }
-  ]);
+  const cashflow = chartDefinition('cashflow');
+  const balance = chartDefinition('balance');
+  drawLineChart($('#cashflowChart'), cashflow.series, cashflow.options);
+  drawLineChart($('#balanceChart'), balance.series, balance.options);
+  drawExpandedChart();
   const first = records[0].balance;
   const last = records.at(-1).balance;
   $('#balanceGain').textContent = `${records.length}个月 ${last >= first ? '+' : ''}${((last - first) / first * 100).toFixed(1)}%`;
+}
+
+function openChartModal(key, trigger) {
+  expandedChartKey = key;
+  lastChartTrigger = trigger;
+  const definition = chartDefinition(key);
+  $('#chartModalKicker').textContent = definition.kicker;
+  $('#chartModalTitle').textContent = definition.title;
+  $('#chartModalNote').textContent = definition.note;
+  $('#chartModalLegend').innerHTML = definition.series.map(item => `<span><i style="background:${item.color}"></i>${item.label}</span>`).join('');
+  $('#chartModal').hidden = false;
+  document.body.classList.add('modal-open');
+  requestAnimationFrame(() => {
+    drawExpandedChart();
+    $('#closeChartModal').focus();
+  });
+}
+
+function closeChartModal() {
+  $('#chartModal').hidden = true;
+  document.body.classList.remove('modal-open');
+  expandedChartKey = null;
+  lastChartTrigger?.focus();
+  lastChartTrigger = null;
 }
 
 $('#addRecord').addEventListener('click', () => openDrawer());
@@ -535,22 +587,9 @@ function setSidebarCollapsed(collapsed) {
 $('#toggleSidebar').addEventListener('click', () => setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed')));
 setSidebarCollapsed(localStorage.getItem('ledger-sidebar-collapsed') === 'true');
 
-$$('[data-fullscreen-chart]').forEach(button => button.addEventListener('click', async () => {
-  const panel = button.closest('.chart-panel');
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await panel.requestFullscreen();
-  } catch {
-    showToast('当前浏览器无法进入全屏模式');
-  }
-}));
-
-document.addEventListener('fullscreenchange', () => {
-  $$('[data-fullscreen-chart]').forEach(button => {
-    button.textContent = button.closest('.chart-panel') === document.fullscreenElement ? '退出全屏' : '全屏查看';
-  });
-  setTimeout(drawAllCharts, 80);
-});
+$$('[data-expand-chart]').forEach(button => button.addEventListener('click', () => openChartModal(button.dataset.expandChart, button)));
+$('#closeChartModal').addEventListener('click', closeChartModal);
+$('#chartModalBackdrop').addEventListener('click', closeChartModal);
 
 function updateActiveNavigation() {
   const marker = window.innerHeight * .36;
@@ -564,6 +603,7 @@ function updateActiveNavigation() {
 
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && $('#recordDrawer').classList.contains('open')) closeDrawer();
+  else if (event.key === 'Escape' && !$('#chartModal').hidden) closeChartModal();
 });
 window.addEventListener('scroll', () => requestAnimationFrame(updateActiveNavigation), { passive: true });
 window.addEventListener('resize', () => requestAnimationFrame(() => { drawAllCharts(); updateActiveNavigation(); }));
@@ -575,22 +615,37 @@ window.addEventListener('beforeunload', event => {
 
 async function initializeApp() {
   try {
-    const response = await fetch('data/personal-finance-ledger.json', { cache: 'no-store' });
-    if (!response.ok) throw new Error('初始化账本不可用');
-    const validated = validateImportedData(await response.json());
+    let source;
+    if (FILE_PREVIEW) {
+      if (!window.__LOCAL_LEDGER__) throw new Error('本地预览数据不可用');
+      source = window.__LOCAL_LEDGER__;
+    } else {
+      const response = await fetch('data/personal-finance-ledger.json', { cache: 'no-store' });
+      if (!response.ok) throw new Error('初始化账本不可用');
+      source = await response.json();
+    }
+    const validated = validateImportedData(source);
     records = validated.records;
     ledgerSettings = validated.settings;
     selectedMonth = records.at(-1)?.month || '';
     isDirty = false;
-    setStatus('data/personal-finance-ledger.json · 已载入', true);
+    setStatus(FILE_PREVIEW ? '本机历史数据 · 只读预览' : 'data/personal-finance-ledger.json · 已载入', true);
   } catch {
     records = [];
     ledgerSettings = { openingBalance: null, payDay: 7, payMonthOffset: 1 };
     selectedMonth = '';
     isDirty = false;
-    setStatus('空账本 · 启动本地服务后自动创建');
+    setStatus(FILE_PREVIEW ? '未找到本机预览数据' : '空账本 · 启动本地服务后自动创建');
   }
   render();
+  if (FILE_PREVIEW) {
+    document.body.classList.add('file-preview');
+    ['#addRecord', '#addRecordSecondary', '#startFirstRecord'].forEach(selector => {
+      const button = $(selector);
+      button.disabled = true;
+      button.title = '双击 HTML 为只读预览；通过本地服务运行时可编辑并自动保存';
+    });
+  }
   updateActiveNavigation();
 }
 

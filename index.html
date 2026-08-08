@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#f3f3f1" />
     <meta name="description" content="离线优先的月度工资、支出与储蓄分析工具" />
     <title>月度账本 · 收支与储蓄分析</title>
     <link rel="stylesheet" href="ledger.css" />
@@ -108,7 +108,7 @@
                 <span><i class="legend-expense"></i>推算支出</span>
                 <span><i class="legend-saving"></i>存款变化</span>
               </div>
-              <button class="fullscreen-button" type="button" data-fullscreen-chart>全屏查看</button>
+              <button class="expand-chart-button" type="button" data-expand-chart="cashflow">放大查看</button>
             </div>
           </div>
           <div class="chart-wrap"><canvas id="cashflowChart" aria-label="收入支出储蓄趋势图"></canvas></div>
@@ -119,7 +119,7 @@
             <div><p class="section-kicker">资产轨迹</p><h2>发薪后余额</h2></div>
             <div class="panel-tools">
               <span id="balanceGain" class="gain-badge">暂无数据</span>
-              <button class="fullscreen-button" type="button" data-fullscreen-chart>全屏查看</button>
+              <button class="expand-chart-button" type="button" data-expand-chart="balance">放大查看</button>
             </div>
           </div>
           <div class="chart-wrap balance-chart"><canvas id="balanceChart" aria-label="发薪后余额趋势图"></canvas></div>
@@ -215,7 +215,21 @@
       </form>
     </aside>
 
+    <div id="chartModal" class="chart-modal" hidden>
+      <button id="chartModalBackdrop" class="chart-modal-backdrop" type="button" aria-label="关闭图表弹窗"></button>
+      <section class="chart-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle">
+        <header class="chart-modal-head">
+          <div><p id="chartModalKicker" class="section-kicker">趋势分析</p><h2 id="chartModalTitle">图表详情</h2></div>
+          <button id="closeChartModal" class="close-button" type="button" aria-label="关闭图表弹窗">×</button>
+        </header>
+        <div id="chartModalLegend" class="chart-legend chart-modal-legend"></div>
+        <div class="chart-modal-wrap"><canvas id="chartModalCanvas" aria-label="放大图表"></canvas></div>
+        <p id="chartModalNote" class="chart-note"></p>
+      </section>
+    </div>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="data/local-ledger.js"></script>
     <script src="ledger.js"></script>
   </body>
 </html>
